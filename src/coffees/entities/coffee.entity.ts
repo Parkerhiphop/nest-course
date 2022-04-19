@@ -29,7 +29,7 @@ export class Coffee {
       cascade: true, // 👈 or optionally just insert or update ['insert']
     },
   ) // 👈
-  flavors: string[];
+  flavors: Flavor[];
 }
 
 /*
