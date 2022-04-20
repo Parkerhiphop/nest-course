@@ -19,6 +19,9 @@ export class Coffee {
   @Column()
   brand: string;
 
+  @Column({ default: 0 })
+  recommendations: number;
+
   // Create A Relation between two entities
   @JoinTable() // 👈 Join the 2 tables - only the OWNER-side does this
   @ManyToMany(

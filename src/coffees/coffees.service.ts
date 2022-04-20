@@ -1,19 +1,24 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Connection, Repository } from 'typeorm';
 import { CreateCoffeeDto } from './dto/create-coffee.dto';
 import { UpdateCoffeeDto } from './dto/update-coffee.dto';
 import { Coffee } from './entities/coffee.entity';
 import { Flavor } from './entities/flavor.entity';
+import { Event } from '../events/entities/event.entity';
 import { PaginationQueryDto } from './../common/dto/pagination-query.dto';
 
 @Injectable()
 export class CoffeesService {
   constructor(
+    // InjectRepository -> To inject a repository
     @InjectRepository(Coffee)
     private readonly coffeeRepository: Repository<Coffee>,
     @InjectRepository(Flavor)
     private readonly flavorRepository: Repository<Flavor>,
+    // Connection is a single database ORM connection to a specific database.
+    // Use to interact w/ DB, like transaction
+    private readonly connection: Connection,
   ) {}
 
   findAll(paginationQuery: PaginationQueryDto) {
@@ -68,6 +73,31 @@ export class CoffeesService {
   async remove(id: string) {
     const coffee = await this.findOne(id);
     return this.coffeeRepository.remove(coffee);
+  }
+
+  // Using queryRunner to run transaction
+  async recommendCoffee(coffee: Coffee) {
+    const queryRunner = this.connection.createQueryRunner();
+
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+    try {
+      coffee.recommendations++;
+
+      const recommendEvent = new Event();
+      recommendEvent.name = 'recommend_coffee';
+      recommendEvent.type = 'coffee';
+      recommendEvent.payload = { coffeeId: coffee.id };
+
+      await queryRunner.manager.save(coffee);
+      await queryRunner.manager.save(recommendEvent);
+
+      await queryRunner.commitTransaction();
+    } catch (err) {
+      await queryRunner.rollbackTransaction();
+    } finally {
+      await queryRunner.release();
+    }
   }
 
   // check if flavor already exist.
